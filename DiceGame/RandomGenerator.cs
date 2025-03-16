@@ -16,22 +16,38 @@ namespace DiceGame
     {
         public static (string key, string HMAC) ComputeHMAC(string message)
         {
+            byte[] keyBytes = GenerateRandomKey();
+            string randomKey = ConvertToHexString(keyBytes);
+
+            string hmacResult = ComputeHMACForMessage(message, keyBytes);
+
+            return (randomKey.ToUpper(), hmacResult.ToUpper());
+        }
+
+        private static byte[] GenerateRandomKey()
+        {
             byte[] keyBytes = new byte[32];
             RandomNumberGenerator.Fill(keyBytes);
-            string RandomKey = string.Concat(keyBytes.Select(b => b.ToString("x2")));
+            return keyBytes;
+        }
 
+        private static string ConvertToHexString(byte[] bytes)
+        {
+            return string.Concat(bytes.Select(b => b.ToString("x2")));
+        }
+
+        private static string ComputeHMACForMessage(string message, byte[] keyBytes)
+        {
             var hmac = new HMac(new Sha3Digest(256));
             hmac.Init(new KeyParameter(keyBytes));
-            
+
             byte[] messageBytes = Encoding.UTF8.GetBytes(message);
             hmac.BlockUpdate(messageBytes, 0, messageBytes.Length);
 
             byte[] hmacBytes = new byte[hmac.GetMacSize()];
             hmac.DoFinal(hmacBytes, 0);
 
-            string hmacResult = string.Concat(hmacBytes.Select(b => b.ToString("x2")));
-
-            return (RandomKey, hmacResult);
+            return ConvertToHexString(hmacBytes);
         }
 
         public static int GenerateRandomNumber(int range)

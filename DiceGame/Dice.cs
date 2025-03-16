@@ -8,6 +8,6 @@ namespace DiceGame
 {
     internal class Dice(int[] sides)
     {
-        public int[] Configuration { get; set; } = new int[sides.Length];
+        public int[] Configuration { get; set; } = sides;
     }
 }

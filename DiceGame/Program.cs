@@ -7,15 +7,15 @@ using System.Text;
 internal class Program
 {
     public const int firstMoveRange = 2;
-    public  static int DiceNum {get;set;}
+    public static int DiceNum { get; set; }
 
-    public static List<Dice> Dice {  get; set; }
+    public static List<Dice> Dice { get; set; }
 
     private static void Main(string[] args)
     {
         Dice = DiceConfiguration.GetConfiguration(args);
         DiceNum = Dice.Count;
-          
+
         DrawLots(firstMoveRange);
     }
 
@@ -25,15 +25,18 @@ internal class Program
         Console.Write($"I selected a random value in the range 0..{range - 1} ");
 
         int randomNum = RandomGenerator.GenerateRandomNumber(range);
-        //Console.WriteLine("CHECK: " + randomNum);
+
         (string, string) hmac = RandomGenerator.ComputeHMAC(randomNum.ToString());
-        
+
         Console.WriteLine("(HMAC: " + hmac.Item2 + ")");
 
 
         Console.WriteLine("Try to guess my selection.");
 
         ShowMenu(firstMoveRange);
+        RequestUserInput(firstMoveRange);
+
+        Console.WriteLine($"My selection: {randomNum} (KEY: {hmac.Item1})");
         ShowMenu(DiceNum);
 
         //Console.WriteLine("KEY: " + hmac.Item1);
@@ -52,11 +55,44 @@ internal class Program
         Console.WriteLine("? - help");
     }
 
-    
+    private static string RequestUserInput(int numOfOptions)
+    {
+        string userInput;
+        do
+        {
+            Console.Write("Your selection: ");
+            userInput = Console.ReadLine();
+        }
+        while (!string.IsNullOrEmpty(userInput) && !IsInputValid(userInput, numOfOptions));
+
+        return userInput;
+    }
+
+    private static bool IsInputValid(string input, int numOfOptions)
+    {
+        if (input == "X" || input == "?" || (int.TryParse(input, out int number) && number < 0 && number >= numOfOptions))
+        {
+            Console.WriteLine("Please, select suggested option from menu.");
+            return false;
+        }
+        return true;
+    }
+
+    private static void ProcessUserChoice(string input)
+    {
+        if (char.IsDigit(input[0])) HandleSelection(int.Parse(input));
+        if (input.Equals('?')) HelpTable.ShowHelpTable();
+        if (input.Equals('X')) Environment.Exit(0);
+    }
+
+    private static void HandleSelection(int selectedItem)
+    {
+        
+    }
 }
 
 // TODO: input dice ✅
-// TODO: define first move (random generation + HMAC) 
+// TODO: define first move (random generation + HMAC)
 // TODO: dice selection
 // TODO: roll the dice (random generation + HMAC)
 // TODO: calculate the result as (x + y) % 6

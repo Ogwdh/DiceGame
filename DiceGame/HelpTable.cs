@@ -10,5 +10,9 @@ namespace DiceGame
     internal class HelpTable
     {
         public ConsoleTable Table { get; set; }
+
+        public HelpTable() { }
+
+        public static void ShowHelpTable() { }
     }
 }
