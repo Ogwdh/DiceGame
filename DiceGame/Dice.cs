@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace DiceGame
 {
-    internal class Dice(int[] sides)
+    public class Dice(int[] sides)
     {
         public int[] Configuration { get; set; } = sides;
     }

@@ -35,30 +35,27 @@ namespace DiceGame
 
         private static List<Dice> ReadDiceInput()
         {
-            return Console.ReadLine().TrimEnd().Split(' ')
-                .Select(dice => new Dice(dice.Split(',')
-                .Select(int.Parse).ToArray()))
-                .ToList();
+            try
+            {
+                return Console.ReadLine().TrimEnd().Split(' ')
+                    .Select(dice => new Dice(dice.Split(',')
+                    .Select(int.Parse).ToArray()))
+                    .ToList();
+            }
+            catch (FormatException)
+            {
+                return new List<Dice>(); // Return empty list to trigger re-input
+            }
         }
 
         private static bool IsValidDiceCount(List<Dice> diceList)
         {
-            if (diceList.Count <= 2)
-            {
-                Console.WriteLine("The number of dice must be greater than 2. Please try again.");
-                return false;
-            }
-            return true;
+            return diceList.Count > 2;
         }
 
         private static bool HasValidSides(List<Dice> diceList)
-        {
-            if (!diceList.All(dice => dice.Configuration.Length == 6))
-            {
-                Console.WriteLine("One or more dice have an invalid number of sides (must be 6).");
-                return false;
-            }
-            return true;
+        { 
+            return !diceList.All(dice => dice.Configuration.Length == 6);
         }
     }
 }
