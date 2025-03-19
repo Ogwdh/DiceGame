@@ -13,6 +13,9 @@ namespace DiceGame
 
         public HelpTable() { }
 
-        public static void ShowHelpTable() { }
+        public static void ShowHelpTable()
+        {
+            Console.WriteLine("TABLE PRINT");
+        }
     }
 }

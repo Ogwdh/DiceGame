@@ -2,55 +2,218 @@
 using DiceGame;
 using Microsoft.VisualBasic;
 using Org.BouncyCastle.Crypto.Digests;
+using Org.BouncyCastle.Crypto.Macs;
 using System.Security.Cryptography;
 using System.Text;
+using System;
+using System.Linq;
+
 internal class Program
 {
-    public const int firstMoveRange = 2;
-    public static int DiceNum { get; set; }
-
-    public static List<Dice> Dice { get; set; }
+    public const int FirstMoveRange = 2;
+    public static int DiceNum { get; private set; }
+    public static List<Dice> Dice { get; private set; }
 
     private static void Main(string[] args)
     {
-        Dice = DiceConfiguration.GetConfiguration(args);
-        DiceNum = Dice.Count;
+        //try
+        {
+            Dice = DiceConfiguration.GetConfiguration(args);
+            DiceNum = Dice.Count;
 
-        DrawLots(firstMoveRange);
+            if (DiceNum < 2)
+            {
+                Console.WriteLine("Error: At least 2 dice configurations are required.");
+                Environment.Exit(1);
+            }
+
+            Play();
+        }
+        //catch (Exception ex)
+        //{
+        //    Console.WriteLine($"Error: {ex.Message}");
+        //    Environment.Exit(1);
+        //}
     }
 
-    private static bool DrawLots(int range)
+    private static void Play()
+    {
+        int firstMovePlayer = DetermineFirstMove();
+        int playerDiceIndex = SelectDice(firstMovePlayer);
+        DetermineWinner(playerDiceIndex, firstMovePlayer);
+    }
+
+    private static int DetermineFirstMove()
     {
         Console.WriteLine("Let's determine who makes the first move.");
-        Console.Write($"I selected a random value in the range 0..{range - 1} ");
 
-        int randomNum = RandomGenerator.GenerateRandomNumber(range);
+        var (hmacKey, hmacValue, randomValue) = GenerateHMAC(FirstMoveRange);
 
-        (string, string) hmac = RandomGenerator.ComputeHMAC(randomNum.ToString());
-
-        Console.WriteLine("(HMAC: " + hmac.Item2 + ")");
-
-
+        Console.WriteLine($"I selected a random value in the range 0..{FirstMoveRange - 1} (HMAC: {hmacValue})");
         Console.WriteLine("Try to guess my selection.");
 
-        ShowMenu(firstMoveRange);
-        RequestUserInput(firstMoveRange);
+        ShowMenu(FirstMoveRange, isFirstMove: true);
 
-        Console.WriteLine($"My selection: {randomNum} (KEY: {hmac.Item1})");
-        ShowMenu(DiceNum);
+        string userInput = RequestUserInput(FirstMoveRange);
+        ProcessUserChoice(userInput);
 
-        //Console.WriteLine("KEY: " + hmac.Item1);
+        int userGuess = int.Parse(userInput);
+        Console.WriteLine($"My selection: {randomValue} (KEY: {hmacKey})");
 
-        return true;
+        if (userGuess == randomValue)
+        {
+            Console.WriteLine("You guessed correctly! You make the first move.");
+            return 0;
+        }
+        else
+        {
+            Console.WriteLine("Your guess was incorrect. I make the first move.");
+            return 1;
+        }
     }
 
-    private static void ShowMenu(int numOfOptions)
+    private static int SelectDice(int firstMovePlayer)
     {
-        Enumerable.Range(0, numOfOptions).ToList().ForEach(i =>
-    Console.WriteLine($"{i} - " +
-        ((numOfOptions == firstMoveRange) ?
-            i.ToString() :
-            $"[{string.Join(", ", Dice[i].Configuration)}]")));
+        int computerDiceIndex;
+        int playerDiceIndex;
+
+        if (firstMovePlayer == 0)
+        {
+            Console.WriteLine("You make the first move.");
+            ShowMenu(DiceNum, isFirstMove: false);
+            string userInput = RequestUserInput(DiceNum);
+            ProcessUserChoice(userInput);
+            playerDiceIndex = int.Parse(userInput);
+
+            computerDiceIndex = SelectRandomDice(playerDiceIndex);
+            Console.WriteLine($"I choose the [{string.Join(", ", Dice[computerDiceIndex].Configuration)}] dice.");
+        }
+        else
+        {
+            computerDiceIndex = RandomGenerator.GenerateRandomNumber(DiceNum);
+            Console.WriteLine($"I make the first move and choose the [{string.Join(", ", Dice[computerDiceIndex].Configuration)}] dice.");
+
+            var availableDice = new List<Dice>();
+            var availableIndices = new List<int>();
+
+            for (int i = 0; i < DiceNum; i++)
+            {
+                if (i != computerDiceIndex)
+                {
+                    availableDice.Add(Dice[i]);
+                    availableIndices.Add(i);
+                }
+            }
+
+            Console.WriteLine("Choose your dice:");
+            for (int i = 0; i < availableDice.Count; i++)
+            {
+                Console.WriteLine($"{i} - [{string.Join(", ", availableDice[i].Configuration)}]");
+            }
+            Console.WriteLine("X - exit");
+            Console.WriteLine("? - help");
+
+            string userInput = RequestUserInput(availableDice.Count);
+            ProcessUserChoice(userInput);
+
+            int selection = int.Parse(userInput);
+            playerDiceIndex = availableIndices[selection];
+
+            Console.WriteLine($"You choose the [{string.Join(", ", Dice[playerDiceIndex].Configuration)}] dice.");
+        }
+
+        return playerDiceIndex;
+    }
+
+
+
+    private static void DetermineWinner(int playerDiceIndex, int firstMovePlayer)
+    {
+        int computerRoll, playerRoll;
+
+        if (firstMovePlayer == 0)
+        {
+            playerRoll = RollDice(false);
+            computerRoll = RollDice(true);
+        }
+        else
+        {
+            computerRoll = RollDice(true);
+            playerRoll = RollDice(false);
+        }
+
+        if (playerRoll > computerRoll)
+        {
+            Console.WriteLine($"You win ({playerRoll} > {computerRoll})!");
+        }
+        else if (computerRoll > playerRoll)
+        {
+            Console.WriteLine($"I win ({computerRoll} > {playerRoll})!");
+        }
+        else
+        {
+            Console.WriteLine($"It's a tie ({playerRoll} = {computerRoll})!");
+        }
+    }
+
+    private static int RollDice(bool isComputer)
+    {
+        string actor = isComputer ? "my" : "your";
+        Console.WriteLine($"It's time for {actor} roll.");
+
+        var (hmacKey, hmacValue, randomValue) = GenerateHMAC(6);
+
+        Console.WriteLine($"I selected a random value in the range 0..5 (HMAC: {hmacValue})");
+        Console.WriteLine("Add your number modulo 6.");
+
+        ShowMenu(6, isFirstMove: true);
+
+        string userInput = RequestUserInput(6);
+        ProcessUserChoice(userInput);
+
+        int userNumber = int.Parse(userInput);
+        Console.WriteLine($"My number is {randomValue} (KEY: {hmacKey})");
+
+        int fairResult = (randomValue + userNumber) % 6;
+        Console.WriteLine($"The fair number generation result is {randomValue} + {userNumber} = {fairResult} (mod 6)");
+
+        int diceValue = isComputer ?
+            Dice[0].Configuration[fairResult] :
+            Dice[1].Configuration[fairResult];
+
+        Console.WriteLine($"{(isComputer ? "My" : "Your")} roll result is {diceValue}.");
+
+        return diceValue;
+    }
+
+    private static int SelectRandomDice(int playerDiceIndex)
+    {
+        int computerDiceIndex;
+        do
+        {
+            computerDiceIndex = RandomGenerator.GenerateRandomNumber(DiceNum);
+        } while (computerDiceIndex == playerDiceIndex);
+
+        return computerDiceIndex;
+    }
+
+    private static (string, string, int) GenerateHMAC(int range)
+    {
+        int randomNum = RandomGenerator.GenerateRandomNumber(range);
+        (string hmacKey, string hmacValue) = RandomGenerator.ComputeHMAC(randomNum.ToString());
+        return (hmacKey, hmacValue, randomNum);
+    }
+
+    private static void ShowMenu(int numOfOptions, bool isFirstMove)
+    {
+        for (int i = 0; i < numOfOptions; i++)
+        {
+            string option = isFirstMove ?
+                i.ToString() :
+                $"[{string.Join(", ", Dice[i].Configuration)}]";
+
+            Console.WriteLine($"{i} - {option}");
+        }
         Console.WriteLine("X - exit");
         Console.WriteLine("? - help");
     }
@@ -61,43 +224,52 @@ internal class Program
         do
         {
             Console.Write("Your selection: ");
-            userInput = Console.ReadLine();
+            userInput = Console.ReadLine()?.Trim().ToUpper() ?? "";
         }
-        while (!string.IsNullOrEmpty(userInput) && !IsInputValid(userInput, numOfOptions));
+        while (!IsInputValid(userInput, numOfOptions));
 
         return userInput;
     }
 
     private static bool IsInputValid(string input, int numOfOptions)
     {
-        if (input == "X" || input == "?" || (int.TryParse(input, out int number) && number < 0 && number >= numOfOptions))
-        {
-            Console.WriteLine("Please, select suggested option from menu.");
-            return false;
-        }
-        return true;
+        if (input == "X" || input == "?")
+            return true;
+
+        if (int.TryParse(input, out int number) && number >= 0 && number < numOfOptions)
+            return true;
+
+        Console.WriteLine("Please, select a suggested option from the menu.");
+        return false;
     }
 
     private static void ProcessUserChoice(string input)
     {
-        if (char.IsDigit(input[0])) HandleSelection(int.Parse(input));
-        if (input.Equals('?')) HelpTable.ShowHelpTable();
-        if (input.Equals('X')) Environment.Exit(0);
+        if (string.IsNullOrEmpty(input))
+            return;
+
+        if (input == "?")
+            HelpTable.ShowHelpTable();
+        else if (input == "X")
+        {
+            if (!ConfirmExit())
+            {
+                return;
+            }
+        }
     }
 
-    private static void HandleSelection(int selectedItem)
+    private static bool ConfirmExit()
     {
-        
+        Console.Write("Are you sure? (y/n): ");
+        string response = Console.ReadLine()?.Trim().ToLower() ?? "";
+
+        if (response == "y")
+            Environment.Exit(0);
+        return false;
     }
+
 }
-
-// TODO: input dice ✅
-// TODO: define first move (random generation + HMAC)
-// TODO: dice selection
-// TODO: roll the dice (random generation + HMAC)
-// TODO: calculate the result as (x + y) % 6
-// TODO: invalid parameters launch
-
 
 //> java - jar game.jar 2,2,4,4,9,9 6,8,1,1,8,6 7,5,3,7,5,3
 //Let's determine who makes the first move.
@@ -151,11 +323,3 @@ internal class Program
 
 //The table generation should be in a separate class.
 //The probability calculation should be in a separate class.
-//The implementation of the fair number generation "protocol" should be in a separate class.
-//The random key/number generation and HMAC calculation should be in a separate class.
-//The dice configuration parsing should be in a separate class. ✅
-//The dice abstraction should be in a separate class. ✅
-
-//You should use the core class libraries and third-party libraries to the maximum, and not reinvent the wheel. 
-
-//THE NUMBER OF DICE CAN BE ARBITRARY ( > 2).
