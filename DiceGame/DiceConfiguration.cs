@@ -44,18 +44,30 @@ namespace DiceGame
             }
             catch (FormatException)
             {
+                Console.WriteLine("Invalid input format.");
+                InquireCorrectInput();
                 return new List<Dice>(); // Return empty list to trigger re-input
             }
         }
 
         private static bool IsValidDiceCount(List<Dice> diceList)
         {
-            return diceList.Count > 2;
+            if (!(diceList.Count > 2))
+            {
+                Console.WriteLine("Invalid number of dice.");
+                return false;
+            }
+            return true;
         }
 
         private static bool HasValidSides(List<Dice> diceList)
-        { 
-            return !diceList.All(dice => dice.Configuration.Length == 6);
+        {
+            if (!diceList.All(dice => dice.Configuration.Length == 6))
+            {
+                Console.WriteLine("Invalid number of sides.");
+                return false;
+            }
+            return true;
         }
     }
 }
